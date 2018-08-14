@@ -106,7 +106,7 @@ class PhpDocumentLoader
     {
         return coroutine(function () use ($uri) {
 
-            $limit = 150000;
+            $limit = 600000;
             $content = yield $this->contentRetriever->retrieve($uri);
             $size = strlen($content);
             if ($size > $limit) {
