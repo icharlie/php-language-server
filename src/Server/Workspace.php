@@ -12,7 +12,8 @@ use LanguageServer\Protocol\{
     SymbolDescriptor,
     ReferenceInformation,
     DependencyReference,
-    Location
+    Location,
+    MessageType
 };
 use Sabre\Event\Promise;
 use function Sabre\Event\coroutine;
@@ -173,5 +174,27 @@ class Workspace
             $dependencyReferences[] = new DependencyReference($package);
         }
         return $dependencyReferences;
+    }
+
+    public function didChangeConfiguration(...$args)
+    {
+        $this->client->window->logMessage(MessageType::INFO, "TODO: Server workspace neeeds to handle configuration change");
+        $this->client->window->logMessage(MessageType::INFO, json_encode($args));
+        return true;
+    }
+
+    public function configuration($configurationParams)
+    {
+        $this->client->window->logMessage(MessageType::INFO, "TODO: configuration method");
+        $this->client->window->logMessage(MessageType::INFO, $configurationParams);
+        return true;
+    }
+
+
+    public function applyEdit($applyWorkspaceEditParams)
+    {
+        $this->client->window->logMessage(MessageType::INFO, "TODO: configuration method");
+        $this->client->window->logMessage(MessageType::INFO, $applyWorkspaceEditParams);
+        return true;
     }
 }

@@ -10,7 +10,8 @@ use LanguageServer\Protocol\{
     Message,
     InitializeResult,
     CompletionOptions,
-    SignatureHelpOptions
+    SignatureHelpOptions,
+    MessageType
 };
 use LanguageServer\FilesFinder\{FilesFinder, ClientFilesFinder, FileSystemFilesFinder};
 use LanguageServer\ContentRetriever\{ContentRetriever, ClientContentRetriever, FileSystemContentRetriever};
@@ -157,6 +158,26 @@ class LanguageServer extends AdvancedJsonRpc\Dispatcher
         $this->client = new LanguageClient($reader, $writer);
     }
 
+
+    /**
+     * Calls the appropiate method handler for an incoming Message
+     *
+     * @param string|object $msg The incoming message
+     * @return Result|void
+     */
+    public function dispatch($msg)
+    {
+        if (is_string($msg)) {
+            $msg = json_decode($msg);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->window->logMessage(MessageType::ERROR, json_last_error_msg());
+                throw new Error(json_last_error_msg(), ErrorCode::PARSE_ERROR);
+            }
+        }
+        $this->client->window->logMessage(MessageType::INFO, $msg->method);
+        return parent::dispatch($msg);
+    }
+
     /**
      * The initialize request is sent as the first request from the client to the server.
      *
@@ -288,6 +309,20 @@ class LanguageServer extends AdvancedJsonRpc\Dispatcher
             return new InitializeResult($serverCapabilities);
         });
     }
+
+    public function initialized(...$args)
+    {
+        $this->client->window->logMessage(MessageType::INFO, 'LanguageServer is initialized');
+        return true;
+    }
+
+
+    public function cancelRequest(...$args)
+    {
+        $this->client->window->logMessage(MessageType::INFO, 'TODO: LanguageServer cancel request.');
+        return true;
+    }
+
 
     /**
      * The shutdown request is sent from the client to the server. It asks the server to shut down, but to not exit

@@ -4,7 +4,10 @@ declare(strict_types = 1);
 namespace LanguageServer\Client;
 
 use LanguageServer\ClientHandler;
-use LanguageServer\Protocol\TextDocumentIdentifier;
+use LanguageServer\Protocol\{
+    TextDocumentIdentifier,
+    MessageType
+};
 use Sabre\Event\Promise;
 use JsonMapper;
 
@@ -43,5 +46,12 @@ class Workspace
         )->then(function (array $textDocuments) {
             return $this->mapper->mapArray($textDocuments, [], TextDocumentIdentifier::class);
         });
+    }
+
+
+    public function didChangeConfiguration(...$args)
+    {
+        $this->handler->notify('window/logMessage', ['type' => MessageType::INFO, 'message' => json_encode($args)]);
+        return true;
     }
 }
