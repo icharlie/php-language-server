@@ -115,49 +115,54 @@ class LanguageServer extends AdvancedJsonRpc\Dispatcher
     {
         parent::__construct($this, '/');
         $this->protocolReader = $reader;
-        $this->protocolReader->on('close', function () {
-            $this->shutdown();
-            $this->exit();
-        });
-        $this->protocolReader->on('message', function (Message $msg) {
-            coroutine(function () use ($msg) {
-                // Ignore responses, this is the handler for requests and notifications
-                if (AdvancedJsonRpc\Response::isResponse($msg->body)) {
-                    return;
-                }
-                $result = null;
-                $error = null;
-                try {
-                    // Invoke the method handler to get a result
-                    $result = yield $this->dispatch($msg->body);
-                } catch (AdvancedJsonRpc\Error $e) {
-                    // If a ResponseError is thrown, send it back in the Response
-                    $error = $e;
-                } catch (Throwable $e) {
-                    // If an unexpected error occurred, send back an INTERNAL_ERROR error response
-                    $error = new AdvancedJsonRpc\Error(
-                        (string)$e,
-                        AdvancedJsonRpc\ErrorCode::INTERNAL_ERROR,
-                        null,
-                        $e
-                    );
-                }
-                // Only send a Response for a Request
-                // Notifications do not send Responses
-                if (AdvancedJsonRpc\Request::isRequest($msg->body)) {
-                    if ($error !== null) {
-                        $responseBody = new AdvancedJsonRpc\ErrorResponse($msg->body->id, $error);
-                    } else {
-                        $responseBody = new AdvancedJsonRpc\SuccessResponse($msg->body->id, $result);
-                    }
-                    $this->protocolWriter->write(new Message($responseBody));
-                }
-            })->otherwise('\\LanguageServer\\crash');
-        });
+        $this->protocolReader->on('close', [ $this, 'close' ]);
+        $this->protocolReader->on('message', [ $this, 'messageCb' ]);
         $this->protocolWriter = $writer;
         $this->client = new LanguageClient($reader, $writer);
     }
 
+    public function messageCb(Message $msg)
+    {
+        coroutine(function () use ($msg) {
+            // Ignore responses, this is the handler for requests and notifications
+            if (AdvancedJsonRpc\Response::isResponse($msg->body)) {
+                return;
+            }
+            $result = null;
+            $error = null;
+            try {
+                // Invoke the method handler to get a result
+                $result = yield $this->dispatch($msg->body);
+            } catch (AdvancedJsonRpc\Error $e) {
+                // If a ResponseError is thrown, send it back in the Response
+                $error = $e;
+            } catch (Throwable $e) {
+                // If an unexpected error occurred, send back an INTERNAL_ERROR error response
+                $error = new AdvancedJsonRpc\Error(
+                    (string)$e,
+                    AdvancedJsonRpc\ErrorCode::INTERNAL_ERROR,
+                    null,
+                    $e
+                );
+            }
+            // Only send a Response for a Request
+            // Notifications do not send Responses
+            if (AdvancedJsonRpc\Request::isRequest($msg->body)) {
+                if ($error !== null) {
+                    $responseBody = new AdvancedJsonRpc\ErrorResponse($msg->body->id, $error);
+                } else {
+                    $responseBody = new AdvancedJsonRpc\SuccessResponse($msg->body->id, $result);
+                }
+                $this->protocolWriter->write(new Message($responseBody));
+            }
+        })->otherwise('\\LanguageServer\\crash');
+    }
+
+    public function close()
+    {
+        $this->shutdown();
+        $this->exit();
+    }
 
     /**
      * Calls the appropiate method handler for an incoming Message
@@ -173,6 +178,8 @@ class LanguageServer extends AdvancedJsonRpc\Dispatcher
                 $this->window->logMessage(MessageType::ERROR, json_last_error_msg());
                 throw new Error(json_last_error_msg(), ErrorCode::PARSE_ERROR);
             }
+        } else {
+            $this->client->window->logMessage(MessageType::INFO, json_encode($msg));
         }
         $this->client->window->logMessage(MessageType::INFO, $msg->method);
         return parent::dispatch($msg);
@@ -188,6 +195,7 @@ class LanguageServer extends AdvancedJsonRpc\Dispatcher
      */
     public function initialize(ClientCapabilities $capabilities, string $rootPath = null, int $processId = null): Promise
     {
+        $this->client->window->logMessage(MessageType::INFO, json_encode(\func_get_args()));
         return coroutine(function () use ($capabilities, $rootPath, $processId) {
 
             if ($capabilities->xfilesProvider) {
@@ -310,6 +318,13 @@ class LanguageServer extends AdvancedJsonRpc\Dispatcher
         });
     }
 
+
+    /**
+     * The initialized notification is sent from the client to the server after the client received the result of
+     * the initialize request but before the client is sending any other request or notification to the server.
+     * The server can use the initialized notification for example to dynamically register capabilities.
+     * The initialized notification may only be sent once.
+     */
     public function initialized(...$args)
     {
         $this->client->window->logMessage(MessageType::INFO, 'LanguageServer is initialized');
@@ -321,18 +336,6 @@ class LanguageServer extends AdvancedJsonRpc\Dispatcher
     {
         $this->client->window->logMessage(MessageType::INFO, 'TODO: LanguageServer cancel request.');
         return true;
-    }
-
-
-    /**
-     * The initialized notification is sent from the client to the server after the client received the result of
-     * the initialize request but before the client is sending any other request or notification to the server.
-     * The server can use the initialized notification for example to dynamically register capabilities.
-     * The initialized notification may only be sent once.
-     */
-    public function initialized()
-    {
-        return null;
     }
 
     /**

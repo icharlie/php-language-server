@@ -176,10 +176,10 @@ class Workspace
         return $dependencyReferences;
     }
 
-    public function didChangeConfiguration(...$args)
+    public function didChangeConfiguration($settings = [])
     {
         $this->client->window->logMessage(MessageType::INFO, "TODO: Server workspace neeeds to handle configuration change");
-        $this->client->window->logMessage(MessageType::INFO, json_encode($args));
+        $this->client->window->logMessage(MessageType::INFO, json_encode($settings));
         return true;
     }
 
